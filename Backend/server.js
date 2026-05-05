@@ -3,6 +3,10 @@ const axios = require('axios');
 const app = express();
 const PORT = 3000;
 
+app.use(cors({
+    origin: "*",
+}));
+
 const MB_BASE_URL = 'https://musicbrainz.org/ws/2';
 const headers = {
     'User-Agent': 'MiAppMusical/1.0.0 ( johnchm007@gmail.com )',
