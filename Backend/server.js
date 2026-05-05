@@ -1,5 +1,6 @@
 const express = require('express');
 const axios = require('axios');
+const cors = require('cors');
 const app = express();
 const PORT = 3000;
 
@@ -15,7 +16,7 @@ const headers = {
 
 app.get('/buscar-artista', async (req, res) => {
     const { nombre } = req.query;
-    
+
     try {
         const response = await axios.get(`${MB_BASE_URL}/artist`, {
             headers,
@@ -32,7 +33,7 @@ app.get('/buscar-artista', async (req, res) => {
 
 app.get('/artista/:mbid/albumes', async (req, res) => {
     const { mbid } = req.params;
-    
+
     try {
         const response = await axios.get(`${MB_BASE_URL}/release`, {
             headers,
