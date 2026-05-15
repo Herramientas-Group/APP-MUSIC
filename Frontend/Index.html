@@ -5,6 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Apple Music - D'Vita</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -543,6 +544,106 @@
             border-top: 1px solid var(--border);
             margin: 20px 0;
         }
+
+        .album-cover img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .album-cover.loading {
+            background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+        }
+
+        .album-cover.loading::after {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            position: absolute;
+        }
+
+        .charts-section {
+            margin-bottom: 24px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 16px;
+            margin-top: 14px;
+        }
+
+        .chart-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .chart-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 12px;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 180px;
+        }
+
+        .stats-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .mini-stat {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mini-stat-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mini-stat-icon.purple { background: rgba(124, 106, 247, 0.15); color: var(--accent); }
+        .mini-stat-icon.pink { background: rgba(224, 92, 151, 0.15); color: var(--accent2); }
+        .mini-stat-icon.green { background: rgba(62, 207, 142, 0.15); color: var(--green); }
+        .mini-stat-icon.amber { background: rgba(245, 158, 11, 0.15); color: var(--amber); }
+
+        .mini-stat-content {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mini-stat-label {
+            font-size: 10px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .mini-stat-value {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text);
+        }
     </style>
 </head>
 
@@ -727,6 +828,8 @@
         ${artist.type ? `<div class="stat"><div class="stat-label">Tipo</div><div class="stat-val" style="font-size:16px">${esc(artist.type)}</div></div>` : ''}
       </div>
 
+      ${renderCharts(artist, albumsData)}
+
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
         <div style="font-size:15px; font-weight:600;">Discografía</div>
         <span class="endpoint-badge">GET /artista/${artist.id}/albumes</span>
@@ -739,13 +842,14 @@
       </div>
     `;
             setReqLog(`— listo —`);
+            cargarPortadas(albums);
         }
 
         function albumCard(rg) {
             const year = rg['first-release-date']?.slice(0, 4) || '';
             return `
       <div class="album-card" onclick="selectAlbum('${rg.id}', '${esc(rg.title)}', this)">
-        <div class="album-cover">
+        <div class="album-cover" data-mbid="${rg.id}">
           <svg class="album-cover-icon" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.2">
             <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>
           </svg>
@@ -818,6 +922,267 @@
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;');
+        }
+
+        // ── Cargar portadas de álbumes ────────────────────────────────────────
+        async function cargarPortadas(albums) {
+            const coverElements = document.querySelectorAll('.album-cover[data-mbid]');
+            const mbidList = Array.from(coverElements).map(el => el.dataset.mbid);
+
+            const promises = mbidList.map(async (mbid, index) => {
+                const el = coverElements[index];
+                el.classList.add('loading');
+                try {
+                    const res = await fetch(`${API}/album/${mbid}/portada`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.portada_url) {
+                            const img = document.createElement('img');
+                            img.src = data.miniaturas?.small || data.portada_url;
+                            img.alt = 'Portada';
+                            img.onload = () => el.classList.remove('loading');
+                            img.onerror = () => el.classList.remove('loading');
+                            el.innerHTML = '';
+                            el.appendChild(img);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error cargando portada:', mbid);
+                }
+                el.classList.remove('loading');
+            });
+
+            await Promise.all(promises);
+        }
+
+        // ── Generar gráfico de álbumes por año ────────────────────────────────
+        function createYearChart(albums, containerId) {
+            const yearCounts = {};
+            albums.forEach(rg => {
+                const year = rg['first-release-date']?.slice(0, 4);
+                if (year && !isNaN(year)) {
+                    yearCounts[year] = (yearCounts[year] || 0) + 1;
+                }
+            });
+
+            const years = Object.keys(yearCounts).sort().slice(-10);
+            const counts = years.map(y => yearCounts[y]);
+
+            const ctx = document.getElementById(containerId).getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: years,
+                    datasets: [{
+                        label: 'Álbumes',
+                        data: counts,
+                        backgroundColor: '#7c6af7',
+                        borderRadius: 4,
+                        barThickness: 24
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#2e2e3e' },
+                            ticks: { color: '#8884a8' }
+                        },
+                        y: {
+                            grid: { color: '#2e2e3e' },
+                            ticks: { color: '#8884a8', stepSize: 1 },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        // ── Generar gráfico de tipos de release ──────────────────────────────
+        function createTypeChart(albums, containerId) {
+            const typeCounts = {};
+            albums.forEach(rg => {
+                const type = rg['primary-type'] || 'Otro';
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+
+            const labels = Object.keys(typeCounts);
+            const data = Object.values(typeCounts);
+            const colors = ['#7c6af7', '#e05c97', '#3ecf8e', '#f59e0b', '#f87171', '#60b4f5'];
+
+            const ctx = document.getElementById(containerId).getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors.slice(0, labels.length),
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { color: '#8884a8', padding: 12, font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ── Generar gráfico de géneros/tags ───────────────────────────────────
+        function createGenreChart(tags, containerId) {
+            const topTags = tags.slice(0, 8);
+            if (topTags.length === 0) return;
+
+            const labels = topTags.map(t => t.name);
+            const counts = topTags.map(t => t.count);
+            const maxCount = Math.max(...counts);
+            const normalized = counts.map(c => (c / maxCount) * 100);
+
+            const ctx = document.getElementById(containerId).getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Frecuencia',
+                        data: normalized,
+                        backgroundColor: '#e05c97',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            grid: { color: '#2e2e3e' },
+                            ticks: { color: '#8884a8' },
+                            max: 100
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: '#f0eeff', font: { size: 11 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ── Renderizar sección de gráficos ───────────────────────────────────
+        function renderCharts(artist, albumsData) {
+            const albums = albumsData['release-groups'] || [];
+            const tags = (artist.tags || []).sort((a, b) => b.count - a.count);
+
+            const yearStats = {};
+            albums.forEach(rg => {
+                const year = rg['first-release-date']?.slice(0, 4);
+                if (year && !isNaN(year)) yearStats[year] = (yearStats[year] || 0) + 1;
+            });
+            const years = Object.keys(yearStats).sort();
+            const latestYear = years.length > 0 ? years[years.length - 1] : '—';
+            const earliestYear = years.length > 0 ? years[0] : '—';
+            const yearSpan = years.length > 1 ? (parseInt(latestYear) - parseInt(earliestYear)) : 0;
+
+            const typeCounts = {};
+            albums.forEach(rg => {
+                const type = rg['primary-type'] || 'Otro';
+                typeCounts[type] = (typeCounts[type] || 0) + 1;
+            });
+            const albumCount = typeCounts['Album'] || 0;
+            const singleCount = (typeCounts['Single'] || 0) + (typeCounts['EP'] || 0);
+
+            return `
+                <div class="charts-section">
+                    <div class="stats-row">
+                        <div class="mini-stat">
+                            <div class="mini-stat-icon purple">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+                                </svg>
+                            </div>
+                            <div class="mini-stat-content">
+                                <span class="mini-stat-label">Más activo</span>
+                                <span class="mini-stat-value">${latestYear}</span>
+                            </div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="mini-stat-icon pink">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                            </div>
+                            <div class="mini-stat-content">
+                                <span class="mini-stat-label">Carrera</span>
+                                <span class="mini-stat-value">${yearSpan > 0 ? yearSpan + ' años' : '—'}</span>
+                            </div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="mini-stat-icon green">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                                </svg>
+                            </div>
+                            <div class="mini-stat-content">
+                                <span class="mini-stat-label">Álbumes</span>
+                                <span class="mini-stat-value">${albumCount}</span>
+                            </div>
+                        </div>
+                        <div class="mini-stat">
+                            <div class="mini-stat-icon amber">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                </svg>
+                            </div>
+                            <div class="mini-stat-content">
+                                <span class="mini-stat-label">Singles/EP</span>
+                                <span class="mini-stat-value">${singleCount}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="charts-grid">
+                        <div class="chart-card">
+                            <div class="chart-title">Álbumes por año</div>
+                            <div class="chart-container">
+                                <canvas id="chartYears"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">Tipos de publicación</div>
+                            <div class="chart-container">
+                                <canvas id="chartTypes"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-card">
+                            <div class="chart-title">Géneros principales</div>
+                            <div class="chart-container">
+                                <canvas id="chartGenres"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Execute chart creation after the HTML is injected
+            setTimeout(() => {
+                createYearChart(albums, 'chartYears');
+                createTypeChart(albums, 'chartTypes');
+                createGenreChart(tags, 'chartGenres');
+            }, 0);
         }
     </script>
 </body>
