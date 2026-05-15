@@ -504,40 +504,7 @@
             max-width: 540px;
         }
 
-        /* ── Endpoint badge ──────────────────────────────── */
-        .endpoint-badge {
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            padding: 3px 9px;
-            border-radius: 6px;
-            background: #0d1f2d;
-            color: #60b4f5;
-            border: 1px solid #1a3a54;
-        }
-
-        .method-badge {
-            font-size: 10px;
-            font-weight: 700;
-            padding: 2px 7px;
-            border-radius: 4px;
-            background: #1a3a54;
-            color: #60b4f5;
-        }
-
-        /* ── Request log ─────────────────────────────────── */
-        .req-log {
-            background: #0a0a10;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px 14px;
-            font-family: 'Courier New', monospace;
-            font-size: 11px;
-            color: #60b4f5;
-            margin-bottom: 20px;
-            min-height: 32px;
-            white-space: nowrap;
-            overflow-x: auto;
-        }
+        
 
         .divider {
             border: none;
@@ -797,8 +764,6 @@
             const ended = lifespan?.ended ? (lifespan.end?.slice(0, 4) || '?') : null;
 
             document.getElementById('mainPanel').innerHTML = `
-      <div class="req-log" id="reqLog">— listo —</div>
-
       <div class="panel-header">
         <div>
           <div class="panel-title">${esc(artist.name)}</div>
@@ -832,7 +797,6 @@
 
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
         <div style="font-size:15px; font-weight:600;">Discografía</div>
-        <span class="endpoint-badge">GET /artista/${artist.id}/albumes</span>
       </div>
 
       <div class="albums-grid" id="albumsGrid">
@@ -841,7 +805,6 @@
                     : albums.map(rg => albumCard(rg)).join('')}
       </div>
     `;
-            setReqLog(`— listo —`);
             cargarPortadas(albums);
         }
 
@@ -893,7 +856,6 @@
       <hr class="divider" />
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
         <div style="font-size:15px; font-weight:600;">Releases — ${esc(title)}</div>
-        <span class="endpoint-badge">GET /album/${rgmbid}/releases</span>
       </div>
       <div class="release-list">
         ${releases.length === 0 ? '<div class="empty">Sin releases</div>' : releases.map(r => `
