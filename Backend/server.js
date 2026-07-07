@@ -2,7 +2,7 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const app = express();
-const PORT = 3000;
+const PORT = 3004;
 
 app.use(cors({ origin: "*" }));
 
@@ -133,6 +133,6 @@ app.get('/cancion/creditos', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
