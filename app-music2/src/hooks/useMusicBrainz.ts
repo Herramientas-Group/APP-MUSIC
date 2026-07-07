@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { Artist, Release, SearchResponse, ReleasesResponse, CoverArtResponse } from '../types/musicbrainz';
 
-const API = 'http://localhost:3004';
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3004';
 
 export function useMusicBrainz() {
   const [loading, setLoading] = useState(false);
