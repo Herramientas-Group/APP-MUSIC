@@ -30,7 +30,7 @@ jobs:
       - name: Build and push Backend
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: ./Backend
           file: ./Backend/Dockerfile
           push: true
           tags: |
@@ -40,7 +40,7 @@ jobs:
       - name: Build and push Frontend
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
+          context: ./app-music2
           file: ./app-music2/Dockerfile
           push: true
           tags: |
